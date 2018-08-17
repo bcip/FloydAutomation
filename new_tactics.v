@@ -1,4 +1,4 @@
-Require Export VST.floyd.proofauto.
+Require Export VST.floyd.proofauto2.
 
 (* EExists *)
 Ltac my_evar name T cb :=
@@ -69,6 +69,8 @@ repeat match goal with
     constr_eq F F'; is_Type_or_type T; change (F T A1 A2 = F' T A1' A2')
 | |- ?F ?T ?A1 ?A2 ?A3 = ?F' ?T' ?A1' ?A2' ?A3' => 
     constr_eq F F'; is_Type_or_type T; change (F T A1 A2 A3 = F' T A1' A2' A3')
+| |- ?F ?T ?A1 ?A2 ?A3 ?A4 = ?F' ?T' ?A1' ?A2' ?A3' ?A4' => 
+    constr_eq F F'; is_Type_or_type T; change (F T A1 A2 A3 A4 = F' T A1' A2' A3' A4')
 end.
 
 Ltac local_cancel_in_syntactic_cancel unify_tac ::=
@@ -189,20 +191,36 @@ Ltac sep_apply_in_entailment H :=
      end
     end.
 
-Ltac new_sep_apply_in_entailment originalH :=
+
+Ltac my_unshelve_evar name T cb evar_tac :=
+  let x := fresh name
+  in
+  unshelve evar (x:T); revgoals;
+  [
+    let x' := eval unfold x in x
+    in
+    clear x; cb x'
+  |
+    evar_tac x
+  ].
+
+Ltac new_sep_apply_in_entailment originalH evar_tac prop_tac :=
   let rec sep_apply_in_entailment_rec H :=
     lazymatch type of H with
     | forall x:?T, _ =>
       lazymatch type of T with
-      | Prop => let H' := fresh "H" in assert (H':T); [try reflexivity | sep_apply_in_entailment_rec (H H'); clear H']
-      | _ => let x' := fresh x in unshelve evar (x':T); revgoals;
-          [let x'' := eval unfold x' in x' in sep_apply_in_entailment_rec (H x'') | fail 0 "Unable to find an instance for the variable" x']
+      | Prop => let H' := fresh "H" in assert (H':T); revgoals; [sep_apply_in_entailment_rec (H H'); clear H' | prop_tac]; revgoals
+      | _ => my_unshelve_evar x T
+        ltac:(fun x => sep_apply_in_entailment_rec (H x))
+        evar_tac
       end
     | ?T -> _ =>
       lazymatch type of T with
-      | Prop => let H' := fresh "H" in assert (H':T); [ try reflexivity | sep_apply_in_entailment_rec (H H'); clear H']
-      | _ => let x' := fresh in unshelve evar (x':T); revgoals;
-          [let x'' := eval unfold x' in x' in sep_apply_in_entailment_rec (H x'') | fail 0 "Unable to find an instance for the variable" x']
+      | Prop => let H' := fresh "H" in assert (H':T); revgoals; [sep_apply_in_entailment_rec (H H'); clear H' | prop_tac]; revgoals
+      | _ => let x := fresh "arg" in
+        my_unshelve_evar x T
+          ltac:(fun x => sep_apply_in_entailment_rec (H x))
+          evar_tac
       end
     | ?A |-- ?B => sep_apply_in_entailment H
     | ?A = ?B => sep_apply_in_entailment H
@@ -211,31 +229,36 @@ Ltac new_sep_apply_in_entailment originalH :=
   in
   sep_apply_in_entailment_rec originalH.
 
-Ltac new_sep_apply_in_lifted_entailment H :=
+Ltac new_sep_apply_in_lifted_entailment H evar_tac prop_tac :=
  apply SEP_entail;
  unfold fold_right_sepcon at 1;
  match goal with |- ?R |-- ?R2 => 
   let r2 := fresh "R2" in pose (r2 := R2); change (R |-- r2);
-  new_sep_apply_in_entailment H;
-  match goal with |- ?R' |-- _ =>
-   let R'' := refold_right_sepcon R' 
-     in replace R' with (fold_right_sepcon R'') 
+  new_sep_apply_in_entailment H evar_tac prop_tac;
+  [ .. | match goal with |- ?R' |-- _ =>
+   let R'' := refold_right_sepcon R'
+     in replace R' with (fold_right_sepcon R'')
            by (unfold fold_right_sepcon; rewrite ?sepcon_emp; reflexivity);
         subst r2; apply derives_refl
-   end
+   end]
  end.
 
-Ltac new_sep_apply_in_semax H :=
-   eapply semax_pre; [new_sep_apply_in_lifted_entailment H | ].
+Ltac new_sep_apply_in_semax H evar_tac prop_tac :=
+   eapply semax_pre; [new_sep_apply_in_lifted_entailment H evar_tac prop_tac | ].
 
-Ltac new_sep_apply H :=
+Ltac new_sep_apply H evar_tac prop_tac :=
  lazymatch goal with
- | |- ENTAIL _ , _ |-- _ => eapply ENTAIL_trans; [new_sep_apply_in_lifted_entailment H | ] 
- | |- @derives mpred _ _ _ => new_sep_apply_in_entailment H
- | |- semax _ _ _ _ => new_sep_apply_in_semax H
+ | |- ENTAIL _ , _ |-- _ => eapply ENTAIL_trans; [new_sep_apply_in_lifted_entailment H evar_tac prop_tac | ] 
+ | |- @derives mpred _ _ _ => new_sep_apply_in_entailment H evar_tac prop_tac
+ | |- semax _ _ _ _ => new_sep_apply_in_semax H evar_tac prop_tac
  end.
 
-Ltac sep_apply ::= new_sep_apply.
+Ltac sep_apply ::=
+  ltac:(fun H =>
+    new_sep_apply H
+      ltac:(fun x =>
+        fail 0 "Unable to find an instance for the variable" x)
+      ltac:(first [assumption | reflexivity | idtac])).
 
 Ltac new_sep_eapply_in_entailment originalH :=
   let rec sep_eapply_in_entailment_rec H :=
@@ -247,7 +270,7 @@ Ltac new_sep_eapply_in_entailment originalH :=
       end
     | ?T -> _ =>
       lazymatch type of T with
-      | Prop => let H' := fresh "H" in assert (H':T); [ try reflexivity | sep_eapply_in_entailment_rec (H H'); clear H']
+      | Prop => let H' := fresh "H" in assert (H':T); [try reflexivity | sep_eapply_in_entailment_rec (H H'); clear H']
       | _ => let x := fresh "arg" in my_evar x T ltac:(fun x => sep_eapply_in_entailment_rec (H x))
       end
     | ?A |-- ?B => sep_apply_in_entailment H
@@ -263,12 +286,12 @@ Ltac new_sep_eapply_in_lifted_entailment H :=
  match goal with |- ?R |-- ?R2 => 
   let r2 := fresh "R2" in pose (r2 := R2); change (R |-- r2);
   new_sep_eapply_in_entailment H;
-  match goal with |- ?R' |-- _ =>
+  [ .. | match goal with |- ?R' |-- _ =>
    let R'' := refold_right_sepcon R' 
      in replace R' with (fold_right_sepcon R'') 
            by (unfold fold_right_sepcon; rewrite ?sepcon_emp; reflexivity);
         subst r2; apply derives_refl
-   end
+   end]
  end.
 
 Ltac new_sep_eapply_in_semax H :=
@@ -281,7 +304,11 @@ Ltac new_sep_eapply H :=
  | |- semax _ _ _ _ => new_sep_eapply_in_semax H
  end.
 
-Ltac sep_eapply := new_sep_eapply.
+Ltac sep_eapply :=
+  ltac:(fun H =>
+    new_sep_apply H
+      ltac:(fun _ => shelve)
+      ltac:(first [assumption | reflexivity | idtac])).
 
 Lemma allp_instantiate': forall {B} (P : B -> mpred) x,
   allp P |-- P x.

@@ -1,6 +1,6 @@
 (** * verif_hash.v: Correctness proof of hash.c *)
 
-Require Import VST.floyd.new_tactics.
+Require Import new_tactics.
 Require Import VST.floyd.library.
 Require Import  hash.
 Instance CompSpecs : compspecs. make_compspecs prog. Defined.
@@ -482,7 +482,7 @@ forward_for_simple_bound N (EX i:Z, EX contents : list val,
 EExists.
 entailer!.
 intros. omega.
-new_sep_apply data_at__data_at. apply derives_refl.
+sep_apply data_at__data_at. apply derives_refl.
 
 assert_PROP ( field_compatible thashtable (DOT _buckets SUB i) vret). {
   entailer!. rewrite <- app_nil_r with (l := [ArraySubsc i; StructField _buckets]).
@@ -511,7 +511,7 @@ assert (contents = (list_repeat (Z.to_nat N) nullval)). {
   intros. autorewrite with sublist. apply H. all: rep_omega.
 }
 subst contents.
-new_sep_apply body_new_table_helper.
+sep_apply body_new_table_helper.
 unfold hashtable_rep.
 EExists.
 ecancel.
@@ -599,8 +599,8 @@ Lemma sublistrep_app: forall al bl ap bp cp,
 Proof.
   intros. unfold sublistrep at 3.
   apply allp_right. intros cl.
-  new_sep_eapply sublistrep_unfold.
-  new_sep_eapply sublistrep_unfold.
+  sep_eapply sublistrep_unfold.
+  sep_eapply sublistrep_unfold.
   rewrite <- app_assoc.
   apply wand_frame_ver.
   (* easier, but maybe confusing *)
@@ -618,7 +618,7 @@ Proof.
   intros.
   apply pred_ext; unfold sublistrep.
   * (* LHS |-- RHS *)
-    (* new_sep_apply (allp_instantiate (B := list (string * Z))). *)
+    (* sep_apply (allp_instantiate (B := list (string * Z))). *)
     (* why not work ? *)
     eapply derives_trans.
     eapply (allp_instantiate _ []).
@@ -710,9 +710,9 @@ do 2 f_equal. rewrite hashtable_get_unfold.
 rewrite H3. replace (hashfun sigma mod 109) with b; auto. rewrite Znth_map by omega.
 rewrite <- H5. simpl in H6. subst dsigma. rewrite list_get_unfold'; auto.
 rewrite (iter_sepcon_split3 b bl) by omega.
-new_sep_apply (listcell_fold). unfold uncurry. rewrite <- H5.
-new_sep_apply (sublistrep_one). cancel.
-do 2 new_sep_apply listrep_app. apply derives_refl'. reflexivity.
+sep_apply (listcell_fold). unfold uncurry. rewrite <- H5.
+sep_apply (sublistrep_one). cancel.
+do 2 sep_apply listrep_app. apply derives_refl'. reflexivity.
 (* if ds <> sigma *)
 forward.
 entailer!. destruct (Int.eq_dec intcmp Int.zero); contradiction.
@@ -720,9 +720,9 @@ entailer!. destruct (Int.eq_dec intcmp Int.zero); contradiction.
 forward.
 (* end of loop *)
 EExists. simpl (fst _); simpl (snd _).
-new_sep_apply listcell_fold.
-new_sep_apply sublistrep_one.
-new_sep_apply (fun al bl ap => sublistrep_app al bl ap p).
+sep_apply listcell_fold.
+sep_apply sublistrep_one.
+sep_apply (fun al bl ap => sublistrep_app al bl ap p).
 entailer!.
 2: ecancel.
 split.
@@ -856,11 +856,11 @@ forward_if.
   simpl. EExists. entailer.
   (* r <> r0 *)
   EExists. ecancel.
-  new_sep_eapply (allp_instantiate' (B := val)).
-  new_sep_apply wand_frame_elim.
-  new_sep_apply sublistrep_one.
-  new_sep_apply listrep_app.
-  new_sep_apply listrep_app.
+  sep_eapply (allp_instantiate' (B := val)).
+  sep_apply wand_frame_elim.
+  sep_apply sublistrep_one.
+  sep_apply listrep_app.
+  sep_apply listrep_app.
   apply derives_refl'. f_equal.
 (* else (if (!p)) *)
 destruct cl as [ | [csigma cc] cl].
@@ -880,13 +880,13 @@ rewrite list_incr_unfold; auto.
 EExists. ecancel.
 eapply derives_trans. 2: apply cancel_left; apply listrep_app with (bp := p).
 simpl in H3. simpl; destruct (EqDec_string sigma csigma); [ | symmetry in H3; contradiction]; simpl.
-new_sep_apply listcell_fold. EExists. ecancel.
+sep_apply listcell_fold. EExists. ecancel.
 destruct (Val.eq r r0); subst.
 (* r = r0 *)
 Intros. subst p bl. instantiate (1 := p0). ecancel. apply sublistrep_nil.
 (* r <> r0 *)
-new_sep_eapply (allp_instantiate' (B := val)).
-new_sep_apply wand_frame_elim.
+sep_eapply (allp_instantiate' (B := val)).
+sep_apply wand_frame_elim.
 cancel.
 (* else (if (cmp = 0)) *)
 forward.
@@ -932,19 +932,19 @@ subst bl p r. unfold_data_at 2%nat. ecancel.
 simpl sublistrep_p.
 unfold sublistrep_p.
 apply allp_right. intros p0'. apply -> wand_sepcon_adjoint.
-new_sep_apply H13.
-new_sep_apply listcell_fold.
+sep_apply H13.
+sep_apply listcell_fold.
 apply sublistrep_one.
 
 unfold_data_at 2%nat. ecancel.
 unfold sublistrep_p.
 apply allp_right. clear dependent p'. intros p'. apply -> wand_sepcon_adjoint.
-new_sep_apply H13.
-new_sep_apply listcell_fold.
-new_sep_eapply (allp_instantiate' (B := val)).
-new_sep_apply wand_frame_elim.
-new_sep_apply sublistrep_one.
-new_sep_apply (sublistrep_app bl).
+sep_apply H13.
+sep_apply listcell_fold.
+sep_eapply (allp_instantiate' (B := val)).
+sep_apply wand_frame_elim.
+sep_apply sublistrep_one.
+sep_apply (sublistrep_app bl).
 apply derives_refl.
 Qed.
 
@@ -1106,7 +1106,7 @@ replace (h + 1 - h) with 1 by omega.
 rewrite sublist_one with (lo := h) by (autorewrite with sublist; rep_omega).
 
 rewrite H at 1.
-new_sep_apply data_at_singleton_array_eq.
+sep_apply data_at_singleton_array_eq.
 cancel.
 rewrite iter_sepcon_split3 with (i := h) by omega.
 unfold uncurry at 2.
@@ -1118,9 +1118,9 @@ cancel.
 unfold hashtable_rep.
 unfold listboxrep. Intros ap.
 erewrite <- data_at_singleton_array_eq by auto.
-new_sep_eapply (allp_instantiate' (B := list val)).
+sep_eapply (allp_instantiate' (B := list val)).
 rewrite H.
-new_sep_apply wand_frame_elim.
+sep_apply wand_frame_elim.
 set (al := list_incr sigma (fst (Znth h cts))).
 Exists (upd_Znth h cts (al, ap)).
 entailer!.
