@@ -1,4 +1,4 @@
-Require Export VST.floyd.proofauto2.
+Require Export VST.floyd.proofauto.
 
 (* EExists *)
 Ltac my_evar name T cb :=
