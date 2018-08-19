@@ -1,6 +1,6 @@
 (** * verif_hash.v: Correctness proof of hash.c *)
 
-Require Import new_tactics.
+Require Import VST.floyd.new_tactics.
 Require Import VST.floyd.library.
 Require Import  hash.
 Instance CompSpecs : compspecs. make_compspecs prog. Defined.
@@ -857,7 +857,7 @@ forward_if.
   (* r <> r0 *)
   EExists. ecancel.
   sep_eapply (allp_instantiate' (B := val)).
-  sep_apply wand_frame_elim.
+  sep_apply wand_frame_elim''.
   sep_apply sublistrep_one.
   sep_apply listrep_app.
   sep_apply listrep_app.
@@ -886,7 +886,7 @@ destruct (Val.eq r r0); subst.
 Intros. subst p bl. instantiate (1 := p0). ecancel. apply sublistrep_nil.
 (* r <> r0 *)
 sep_eapply (allp_instantiate' (B := val)).
-sep_apply wand_frame_elim.
+sep_apply wand_frame_elim''.
 cancel.
 (* else (if (cmp = 0)) *)
 forward.
@@ -942,7 +942,7 @@ apply allp_right. clear dependent p'. intros p'. apply -> wand_sepcon_adjoint.
 sep_apply H13.
 sep_apply listcell_fold.
 sep_eapply (allp_instantiate' (B := val)).
-sep_apply wand_frame_elim.
+sep_apply wand_frame_elim''.
 sep_apply sublistrep_one.
 sep_apply (sublistrep_app bl).
 apply derives_refl.
@@ -1120,7 +1120,7 @@ unfold listboxrep. Intros ap.
 erewrite <- data_at_singleton_array_eq by auto.
 sep_eapply (allp_instantiate' (B := list val)).
 rewrite H.
-sep_apply wand_frame_elim.
+sep_apply wand_frame_elim''.
 set (al := list_incr sigma (fst (Znth h cts))).
 Exists (upd_Znth h cts (al, ap)).
 entailer!.

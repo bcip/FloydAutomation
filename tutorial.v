@@ -67,7 +67,7 @@ Goal forall P Q R (x y : val),
 Proof.
   intros.
   Fail sep_apply H.
-  (* It failes because z is not found. *)
+  (* It fails because z is not found. *)
   sep_eapply H.
   cancel.
   Unshelve.
@@ -81,4 +81,15 @@ Proof.
   intros.
   sep_eapply (allp_instantiate' (B := val)).
   ecancel.
+Qed.
+
+(* Please use wand_frame_elim'' instead of wand_frame_elim to help sep_apply to find (P -* Q) first. *)
+Goal forall A B,
+  (A -* B) * A |-- B.
+Proof.
+  intros.
+  Fail sep_apply wand_frame_elim.
+  (* It fails because sep_apply matches (P := (A -* B)). *)
+  sep_apply wand_frame_elim''.
+  cancel.
 Qed.
