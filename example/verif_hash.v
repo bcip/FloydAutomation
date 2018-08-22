@@ -68,11 +68,11 @@ Definition hash_spec : ident * funspec :=
   PRE [ _s OF (tptr tschar) ]
           PROP  (readable_share sh)
           LOCAL (temp _s s)
-          SEP   (cstring Tsh contents s)
+          SEP   (cstring sh contents s)
   POST [ tuint ]
         PROP ()
 	LOCAL(temp ret_temp  (Vint (Int.repr (hashfun contents))))
-        SEP (cstring Tsh contents s).
+        SEP (cstring sh contents s).
 
 (** ** DATA STRUCTURES FOR HASHTABLE *)
 
@@ -324,7 +324,7 @@ forward_while
           temp _i (Vint (Int.repr i));
           temp _n (Vint (Int.repr (hashfun (sublist 0 i contents))));
           temp _s s)
-   SEP   (data_at Tsh (tarray tschar (Zlength contents + 1)) (map Vbyte (contents ++ [Byte.zero])) s)).
+   SEP   (data_at sh (tarray tschar (Zlength contents + 1)) (map Vbyte (contents ++ [Byte.zero])) s)).
 * (* current state *)
 EExists. entailer!. rep_omega.
 * (* type check *)
@@ -583,11 +583,13 @@ Proof.
   intros. do 2 rewrite <- sublistrep_nullval_listrep. apply sublistrep_app.
 Qed.
 
+Ltac cancel_for_evar_frame ::= cancel_for_evar_frame' ecancel_local_tac.
+
 Lemma body_get: semax_body Vprog Gprog f_get get_spec.
 Proof.
 start_function.
 rename p into table.
-forward_call (s, Tsh, sigma).
+forward_call. (* (s, Tsh, sigma) *)
 forward.
 pose proof (hashfun_inrange sigma).
 rewrite modu_repr by rep_omega.
@@ -663,6 +665,7 @@ entailer!. destruct (Int.eq_dec intcmp Int.zero); contradiction.
 forward.
 (* end of loop *)
 EExists. simpl (fst _); simpl (snd _).
+focus_SEP 6.
 sep_apply listcell_fold.
 sep_apply sublistrep_one.
 sep_apply (fun al bl ap => sublistrep_app al bl ap p).
@@ -786,7 +789,7 @@ forward_loop (EX r:val, EX p:val, EX bl:list (string * Z), EX cl:list (string * 
 Intros r p bl cl.
 forward.
 forward_if.
-  forward_call (s, sigma, 1, nullval). Intros pnew.
+  forward_call.  (* (s, sigma, 1, nullval) *) Intros pnew.
   forward.
   forward.
   unfold listboxrep, sublistrep_p.
@@ -802,6 +805,7 @@ forward_if.
   sep_eapply (allp_instantiate' (B := val)).
   sep_apply wand_frame_elim''.
   sep_apply sublistrep_one.
+  change (Vint (Int.repr 0)) with nullval.
   sep_apply listrep_app.
   sep_apply listrep_app.
   apply derives_refl'. f_equal.
@@ -811,7 +815,7 @@ destruct cl as [ | [csigma cc] cl].
   assert_PROP (p = nullval) by entailer. contradiction.
 simpl. unfold list_cell. Intros p' cs.
 forward.
-forward_call (cs, csigma, s, sigma).
+forward_call. (* (cs, csigma, s, sigma) *)
 Intros rcmp.
 forward_if.
 (* if (cmp = 0) *)
@@ -902,7 +906,7 @@ Proof.
 intros.
 apply pred_ext.
 entailer!. rewrite field_at_data_at; auto.
-entailer!. rewrite field_at_data_at; auto.
+entailer!.
 Qed.
 
 Ltac wand_slice_array_spec t :=
@@ -985,7 +989,7 @@ pose (j := EX cts:list (list (string * Z) * val),
        iter_sepcon (uncurry listrep) cts))%assert).
 apply semax_seq' with j; subst j; abbreviate_semax.
 {
-  forward_call (s, Tsh, sigma).
+  forward_call. (* (s, Tsh, sigma) *)
   forward.
   assert_PROP (Zlength contents = N) by entailer.
   unfold hashtable_rep. Intros bl. EExists.
@@ -994,7 +998,6 @@ apply semax_seq' with j; subst j; abbreviate_semax.
   split.
   autorewrite with sublist in *. auto.
   f_equal. symmetry. apply modu_repr. apply hashfun_inrange. rep_omega.
-  ecancel.
 }
 
 Intros cts.
@@ -1031,38 +1034,36 @@ assert_PROP (
   entailer.
 }
 
-
-
-forward_call ((field_address thashtable (DOT _buckets SUB h) table),
-      fst (Znth h cts), s, sigma).
-3: rewrite Znth_map in Hmax by rep_omega; auto.
 rewrite H.
-assert_PROP (is_pointer_or_null (field_address thashtable [ArraySubsc h; StructField _buckets] table)). {
-  entailer!.
-}
-rewrite field_address_clarify with (path := [ArraySubsc h; StructField _buckets]) by auto.
-entailer.
-
+assert_PROP (is_pointer_or_null (field_address thashtable (DOT _buckets SUB h) table)).
+entailer!.
+assert_PROP (force_val (sem_add_ptr_int (tptr (Tstruct _cell noattr)) Unsigned (offset_val 0 table) (Vint (Int.repr h)))
+  = field_address thashtable (DOT _buckets SUB h) table).
+entailer!. rewrite field_address_clarify by auto. reflexivity.
+forward_call. (* ((field_address thashtable (DOT _buckets SUB h) table),
+      fst (Znth h cts), s, sigma) *)
 unfold listboxrep.
 EExists.
 replace (h + 1 - h) with 1 by omega.
+rewrite H3.
 rewrite sublist_one with (lo := h) by (autorewrite with sublist; rep_omega).
-
-rewrite H at 1.
 sep_apply data_at_singleton_array_eq.
-cancel.
+ecancel.
 rewrite iter_sepcon_split3 with (i := h) by omega.
 unfold uncurry at 2.
 rewrite Znth_map by omega.
 fold fold_right_sepcon.
-cancel.
+ecancel.
+
+rewrite Znth_map in Hmax by rep_omega; auto.
+
+rewrite H3.
 forward.
 cancel.
 unfold hashtable_rep.
 unfold listboxrep. Intros ap.
 erewrite <- data_at_singleton_array_eq by auto.
 sep_eapply (allp_instantiate' (B := list val)).
-rewrite H.
 sep_apply wand_frame_elim''.
 set (al := list_incr sigma (fst (Znth h cts))).
 Exists (upd_Znth h cts (al, ap)).
