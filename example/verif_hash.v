@@ -299,63 +299,6 @@ Hint Resolve thashtable_local_facts : saturate_local.
 
 (* BEGINNING OF THE PROOFS OF THE FUNCTION BODIES. *)
 
-(* This lemma demonstrates how to handle "strings", that is,
-   null-terminated arrays of characters. *)
-Lemma demonstrate_cstring1: 
- forall i contents,
-   ~ In Byte.zero contents ->
-   Znth i (contents ++ [Byte.zero]) <> Byte.zero  ->
-   0 <= i <= Zlength contents ->
-   0 <= i + 1 < Zlength (contents ++ [Byte.zero]).
-Proof.
-intros.
-(* When processing a C null-terminated string, you will want to
-   maintain the three kinds of assumptions above the line.
-   A string is an array of characters with three parts:
-   (1) The "contents" of the string, none of which is the '\0' character;
-   (2) The null termination character, equal to Byte.zero;
-   (3) the remaining garbage in the array, after the null.
-  The first assumption above the line says that none of the
-  contents is the null character. 
-  Now suppose we are in a loop where variable [_i] (with value [i])
-  is traversing the array.  We expect that loop to go up to but 
-  no farther than the null character, that is, one past the contents.
-  Therefore [0 <= i <= Zlength contents].
-  Furthermore, suppose we have determined (by an if-test) that
-  s[i] is not zero, then we have the hypothesis H0 above.
-
-  The [cstring Tsh] tactic processes all three of them to conclude
-  that [i < Zlength contents]. *)
-assert (H7: i < Zlength contents) by cstring.
-
-(* But actually, [cstring Tsh] tactic will prove any rep_omega consequence
-   of that fact.  For example: *)
-clear H7.
-autorewrite with sublist.
-cstring.
-Fail idtac.  (* demonstrates that there are "No more subgoals." *)
-Abort. (* Throw this away.  Don't apply this lemma in the
-    body_hash proof, instead, use [autorewrite with sublist] and
-    [cstring Tsh] directly, where appropriate. *)
-
-Lemma demonstrate_cstring2: 
- forall i contents,
-   ~ In Byte.zero contents ->
-   Znth i (contents ++ [Byte.zero]) = Byte.zero  ->
-   0 <= i <= Zlength contents ->
-   i = Zlength contents.
-Proof.
-intros.
-(* Here is another demonstration.  When you loop on the
-   string contents reaches the end, so that s[i] is the zero byte,
-   you'll have the an assumption like [H0] above the line.
-   The [cstring Tsh] tactic handles this case too, to prove 
-   [i = Zlength contents].   *)
-cstring.
-Fail idtac. (* No more subgoals. *)
-Abort.  (* Use the method, not the lemma. *)
-
-
 Lemma body_hash: semax_body Vprog Gprog f_hash hash_spec.
 Proof.
 start_function.

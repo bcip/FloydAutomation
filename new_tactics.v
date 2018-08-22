@@ -75,14 +75,54 @@ repeat match goal with
     constr_eq F F'; is_Type_or_type T; change (F T A1 A2 A3 A4 = F' T A1' A2' A3' A4')
 end.
 
+Ltac is_Type_or_type T :=
+  match type of T with
+  | Type => idtac
+  | type => idtac
+  end.
+
+Ltac is_fast_unify_type T :=
+  match type of T with
+  | Type => idtac
+  | type => idtac
+  | val => idtac
+  end.
+  (*lazymatch type of T with
+  | mpred => fail
+  | _ => idtac
+  end.*)
+
+Lemma fun_equal: forall {A B} (f g : A -> B) (x y : A),
+  f = g -> x = y -> f x = g y.
+Proof. congruence. Qed.
+
+Lemma fun_equal': forall {A B} (f g : forall (x:A), B x) (y : A),
+  f = g -> f y = g y.
+Proof. congruence. Qed.
+
+Ltac ecareful_unify ::=
+  match goal with
+  | |- ?X = ?X' => first [is_Type_or_type X | is_evar X | is_evar X' | constr_eq X X']; reflexivity
+  | |- ?F _ = ?F' _ => first [apply fun_equal | apply fun_equal' with (f := F)]; revgoals; solve[ecareful_unify]
+  end; idtac.
+
+Ltac careful_unify ::=
+  match goal with
+  | |- ?X = ?X' => first [is_Type_or_type X | constr_eq X X']; reflexivity
+  | |- ?F _ = ?F' _ => first [apply fun_equal | apply fun_equal' with (f := F)]; revgoals; solve[careful_unify]
+  end; idtac.
+
 Ltac local_cancel_in_syntactic_cancel unify_tac ::=
   cbv beta;
   match goal with |- ?A |-- ?B => 
     solve [constr_eq A B; simple apply (derives_refl A)
-          | (tryif first [is_evar A | is_evar B] then fail else auto with nocore cancel)
+          | (tryif first [has_evar A | has_evar B] then fail else auto with nocore cancel)
           (* | auto with nocore cancel *)
           | apply derives_refl'; solve [unify_tac]]
   end.
+
+(* Ltac local_cancel_in_syntactic_cancel unify_tac ::=
+  apply derives_refl'; solve [unify_tac]. *)
 
 Ltac syntactic_cancel local_tac ::=
   repeat first
@@ -159,9 +199,6 @@ Ltac new_cancel local_tac ::=
     end
   ].
 
-Ltac cancel_local_tac := local_cancel_in_syntactic_cancel careful_unify.
-Ltac cancel ::= new_cancel cancel_local_tac.
-
 Lemma field_at_data_at_cancel': forall {cs : compspecs} sh t v p,
   field_at sh t nil v p = data_at sh t v p.
 Proof.
@@ -169,6 +206,15 @@ Proof.
   apply field_at_data_at_cancel.
   apply data_at_field_at_cancel.
 Qed.
+
+Ltac cancel_unify_tac :=
+  rewrite ?field_at_data_at_cancel';
+  rewrite ?field_at_data_at;
+  rewrite ?field_at__data_at_;
+  rewrite ?data_at__data_at;
+  careful_unify.
+Ltac cancel_local_tac := local_cancel_in_syntactic_cancel cancel_unify_tac.
+Ltac cancel ::= new_cancel cancel_local_tac.
 
 Ltac ecancel_unify_tac :=
   rewrite ?field_at_data_at_cancel';
